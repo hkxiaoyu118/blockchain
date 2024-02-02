@@ -1,0 +1,4 @@
+package gochain
+
+func main() {
+}

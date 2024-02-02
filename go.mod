@@ -1,4 +1,4 @@
-module github.com/hkxiaoyu118/blockchain
+module blockchain
 
 go 1.21
 

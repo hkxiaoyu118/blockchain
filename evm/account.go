@@ -1,7 +1,7 @@
 package evm
 
 import (
-	"github.com/hkxiaoyu118/blockchain/evm/src"
+	"blockchain/evm/src"
 	"math/big"
 )
 

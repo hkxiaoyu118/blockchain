@@ -1,4 +1,4 @@
-package gochain
+package blockchain
 
 func main() {
 }

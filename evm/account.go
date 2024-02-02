@@ -1,7 +1,7 @@
 package evm
 
 import (
-	"gochain/evm/src"
+	"blockchain/evm/src"
 	"math/big"
 )
 

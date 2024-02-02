@@ -1,6 +1,8 @@
 package src
 
 import (
+	"blockchain/evm/erc"
+	"blockchain/utils"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -8,8 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"gochain/evm/erc"
-	"gochain/utils"
 	"golang.org/x/crypto/sha3"
 	"math/big"
 	"strconv"

@@ -1,4 +1,4 @@
-module gochain
+module blockchain
 
 go 1.21
 

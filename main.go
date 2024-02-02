@@ -1,4 +1,4 @@
-package blockchain
+package main
 
 func main() {
 }

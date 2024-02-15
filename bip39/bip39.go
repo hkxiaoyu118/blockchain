@@ -2,6 +2,7 @@ package bip39
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -60,4 +61,9 @@ func GetWalletAddressByPriKey(privateKeyStr string) (string, error) {
 	}
 	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
 	return address, nil
+}
+
+func GetSeed(mnemonic, password string) string {
+	seed := bip39.NewSeed(mnemonic, password)
+	return hex.EncodeToString(seed)
 }

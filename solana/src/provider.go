@@ -268,13 +268,14 @@ func (m *Provider) GetTokenAccountsByDelegate(pubkey string, mintId string) ([]*
 	return out.Value, nil
 }
 
-func (m *Provider) GetTokenAccountsByOwner(pubkey string) ([]token.Account, error) {
+func (m *Provider) GetTokenAccountsByOwner(pubkey string, mint string) ([]token.Account, error) {
 	pubKey := solana.MustPublicKeyFromBase58(pubkey)
+	mintPubKey := solana.MustPublicKeyFromBase58(mint)
 	out, err := m.Client.GetTokenAccountsByOwner(
 		context.TODO(),
 		pubKey,
 		&rpc.GetTokenAccountsConfig{
-			Mint: solana.WrappedSol.ToPointer(),
+			Mint: &mintPubKey,
 		},
 		&rpc.GetTokenAccountsOpts{
 			Encoding: solana.EncodingBase64Zstd,

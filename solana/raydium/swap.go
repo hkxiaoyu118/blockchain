@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	gas "github.com/gagliardetto/solana-go/programs/compute-budget"
@@ -31,74 +30,69 @@ func NewRaydiumSwap(clientRPC *rpc.Client, account solana.PrivateKey) *RaydiumSw
 
 func (s *RaydiumSwap) EasySwap(
 	ctx context.Context,
-	targetPool string,
-	amount uint64,
+	targetPool *Pool,
+	amountIn uint64,
+	amountOutMin uint64,
 	fromToken string,
 	fromAccount solana.PublicKey,
 	toToken string,
 	toAccount solana.PublicKey,
-	microLamports uint64,
-	units uint32,
+	unitPrice uint64,
+	unitLimit uint32,
 ) (*solana.Signature, error) {
-	parsedPool, err := FindPoolInfoByID(targetPool)
-	if err != nil {
-		return nil, err
-	}
-
-	spew.Dump(parsedPool)
-
 	return s.Swap(ctx, &RaydiumPoolConfig{
-		AmmId:                 parsedPool.ID,
-		AmmAuthority:          parsedPool.Authority,
-		AmmOpenOrders:         parsedPool.OpenOrders,
-		AmmTargetOrders:       parsedPool.TargetOrders,
+		AmmId:                 targetPool.ID,
+		AmmAuthority:          targetPool.Authority,
+		AmmOpenOrders:         targetPool.OpenOrders,
+		AmmTargetOrders:       targetPool.TargetOrders,
 		AmmQuantities:         config.NativeSOL,
-		PoolCoinTokenAccount:  parsedPool.BaseVault,
-		PoolPcTokenAccount:    parsedPool.QuoteVault,
-		SerumProgramId:        parsedPool.MarketProgramId,
-		SerumMarket:           parsedPool.MarketId,
-		SerumBids:             parsedPool.MarketBids,
-		SerumAsks:             parsedPool.MarketAsks,
-		SerumEventQueue:       parsedPool.MarketEventQueue,
-		SerumCoinVaultAccount: parsedPool.MarketBaseVault,
-		SerumPcVaultAccount:   parsedPool.MarketQuoteVault,
-		SerumVaultSigner:      parsedPool.MarketAuthority,
-	}, amount, fromToken, fromAccount, toToken, toAccount, microLamports, units)
+		PoolCoinTokenAccount:  targetPool.BaseVault,
+		PoolPcTokenAccount:    targetPool.QuoteVault,
+		SerumProgramId:        targetPool.MarketProgramId,
+		SerumMarket:           targetPool.MarketId,
+		SerumBids:             targetPool.MarketBids,
+		SerumAsks:             targetPool.MarketAsks,
+		SerumEventQueue:       targetPool.MarketEventQueue,
+		SerumCoinVaultAccount: targetPool.MarketBaseVault,
+		SerumPcVaultAccount:   targetPool.MarketQuoteVault,
+		SerumVaultSigner:      targetPool.MarketAuthority,
+	}, amountIn, amountOutMin, fromToken, fromAccount, toToken, toAccount, unitPrice, unitLimit)
 }
 
 func (s *RaydiumSwap) Swap(
 	ctx context.Context,
 	pool *RaydiumPoolConfig,
 	amount uint64,
+	amountOutMin uint64,
 	fromToken string,
 	fromAccount solana.PublicKey,
 	toToken string,
 	toAccount solana.PublicKey,
-	microLamports uint64,
-	units uint32,
+	unitPrice uint64,
+	unitLimit uint32,
+
 ) (*solana.Signature, error) {
-	minimumOutAmount := uint64(1)
-	if minimumOutAmount <= 0 {
+	if amountOutMin <= 0 {
 		return nil, errors.New("min swap output amount must be grater then zero, try to swap a bigger amount")
 	}
 
-	var instrs []solana.Instruction
+	var instList []solana.Instruction
 	signers := []solana.PrivateKey{s.account}
 
-	if microLamports != 0 {
-		unitPriceInst, err := gas.NewSetComputeUnitPriceInstruction(microLamports).ValidateAndBuild()
+	if unitPrice != 0 {
+		unitPriceInst, err := gas.NewSetComputeUnitPriceInstruction(unitPrice).ValidateAndBuild()
 		if err != nil {
 			return nil, err
 		}
-		instrs = append(instrs, unitPriceInst)
+		instList = append(instList, unitPriceInst)
 	}
 
-	if units != 0 {
-		unitLimit, err := gas.NewSetComputeUnitLimitInstruction(units).ValidateAndBuild()
+	if unitLimit != 0 {
+		unitLimit, err := gas.NewSetComputeUnitLimitInstruction(unitLimit).ValidateAndBuild()
 		if err != nil {
 			return nil, err
 		}
-		instrs = append(instrs, unitLimit)
+		instList = append(instList, unitLimit)
 	}
 
 	tempAccount := solana.NewWallet()
@@ -127,7 +121,7 @@ func (s *RaydiumSwap) Swap(
 		if err != nil {
 			return nil, err
 		}
-		instrs = append(instrs, createInst)
+		instList = append(instList, createInst)
 		initInst, err := token.NewInitializeAccountInstruction(
 			tempAccount.PublicKey(),
 			solana.MustPublicKeyFromBase58(config.WrappedSOL),
@@ -137,7 +131,7 @@ func (s *RaydiumSwap) Swap(
 		if err != nil {
 			return nil, err
 		}
-		instrs = append(instrs, initInst)
+		instList = append(instList, initInst)
 		signers = append(signers, tempAccount.PrivateKey)
 		// Use this new temp account as from or to
 		if fromToken == config.NativeSOL {
@@ -148,9 +142,9 @@ func (s *RaydiumSwap) Swap(
 		}
 	}
 
-	instrs = append(instrs, NewRaydiumSwapInstruction(
+	instList = append(instList, NewRaydiumSwapInstruction(
 		amount,
-		minimumOutAmount,
+		amountOutMin,
 		solana.TokenProgramID,
 		solana.MustPublicKeyFromBase58(pool.AmmId),
 		solana.MustPublicKeyFromBase58(pool.AmmAuthority),
@@ -181,10 +175,10 @@ func (s *RaydiumSwap) Swap(
 		if err != nil {
 			return nil, err
 		}
-		instrs = append(instrs, closeInst)
+		instList = append(instList, closeInst)
 	}
 
-	sig, err := src.ExecuteInstructions(ctx, s.clientRPC, signers, instrs...)
+	sig, err := src.ExecuteInstructions(ctx, s.clientRPC, signers, instList...)
 	if err != nil {
 		return nil, err
 	}

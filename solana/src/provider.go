@@ -11,6 +11,7 @@ import (
 )
 
 type Provider struct {
+	RPCUrl string
 	Client *rpc.Client
 }
 
@@ -21,6 +22,7 @@ func (m *Provider) InitProvider(rpcUrl string) error {
 		rpc.CommitmentFinalized,
 	)
 	if err == nil {
+		m.RPCUrl = rpcUrl
 		m.Client = client
 	}
 	return err

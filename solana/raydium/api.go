@@ -42,10 +42,7 @@ type Pool struct {
 	LookupTableAccount string `json:"lookupTableAccount"`
 }
 
-// GetMainnetPoolsInfo retrieves the mainnet pool information from the Raydium API.
-// It makes an HTTP GET request to "https://api.raydium.io/v2/sdk/liquidity/mainnet.json"
-// and returns a pointer to a PoolInfo struct and an error.
-// todo: 这个破方法，非常非常非常慢，所以最好是使用mysql/sqlite/redis等数据库进行保存，方面查询，不然就是噩梦
+// GetMainnetPoolsInfo todo: 这个破方法，非常非常非常慢，所以最好是使用mysql/sqlite/redis等数据库进行保存，方面查询，不然就是噩梦
 func GetMainnetPoolsInfo() (*PoolInfo, error) {
 	response, err := http.Get("https://api.raydium.io/v2/sdk/liquidity/mainnet.json")
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	gas "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -36,6 +37,8 @@ func (s *RaydiumSwap) EasySwap(
 	fromAccount solana.PublicKey,
 	toToken string,
 	toAccount solana.PublicKey,
+	microLamports uint64,
+	units uint32,
 ) (*solana.Signature, error) {
 	parsedPool, err := FindPoolInfoByID(targetPool)
 	if err != nil {
@@ -60,7 +63,7 @@ func (s *RaydiumSwap) EasySwap(
 		SerumCoinVaultAccount: parsedPool.MarketBaseVault,
 		SerumPcVaultAccount:   parsedPool.MarketQuoteVault,
 		SerumVaultSigner:      parsedPool.MarketAuthority,
-	}, amount, fromToken, fromAccount, toToken, toAccount)
+	}, amount, fromToken, fromAccount, toToken, toAccount, microLamports, units)
 }
 
 func (s *RaydiumSwap) Swap(
@@ -71,6 +74,8 @@ func (s *RaydiumSwap) Swap(
 	fromAccount solana.PublicKey,
 	toToken string,
 	toAccount solana.PublicKey,
+	microLamports uint64,
+	units uint32,
 ) (*solana.Signature, error) {
 	minimumOutAmount := uint64(1)
 	if minimumOutAmount <= 0 {
@@ -79,6 +84,23 @@ func (s *RaydiumSwap) Swap(
 
 	var instrs []solana.Instruction
 	signers := []solana.PrivateKey{s.account}
+
+	if microLamports != 0 {
+		unitPriceInst, err := gas.NewSetComputeUnitPriceInstruction(microLamports).ValidateAndBuild()
+		if err != nil {
+			return nil, err
+		}
+		instrs = append(instrs, unitPriceInst)
+	}
+
+	if units != 0 {
+		unitLimit, err := gas.NewSetComputeUnitLimitInstruction(units).ValidateAndBuild()
+		if err != nil {
+			return nil, err
+		}
+		instrs = append(instrs, unitLimit)
+	}
+
 	tempAccount := solana.NewWallet()
 	needWrapSOL := fromToken == config.NativeSOL || toToken == config.NativeSOL
 	if needWrapSOL {
